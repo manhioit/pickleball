@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Trọng tài Pickleball</title>
+  <style>
+    :root{
+      --bg:#0f172a;--panel:#111827;--panel2:#1f2937;--text:#f8fafc;--muted:#cbd5e1;
+      --blue:#2563eb;--orange:#d97706;--green:#22c55e;--yellow:#facc15;--red:#ef4444;
+      --line:rgba(255,255,255,.12);--shadow:0 14px 36px rgba(0,0,0,.28)
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    body{padding:max(10px,env(safe-area-inset-top)) 10px max(16px,env(safe-area-inset-bottom))}
+    button,input,select{font:inherit}
+    .app{width:min(100%,760px);margin:auto}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+    h1{margin:0;font-size:clamp(20px,5vw,30px)}
+    .small-btn,.action-btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:13px;font-weight:800}
+    .small-btn{padding:10px 13px}
+    .status{background:linear-gradient(145deg,#111827,#1f2937);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center;box-shadow:var(--shadow);margin-bottom:10px}
+    .call{font-size:clamp(34px,10vw,62px);font-weight:950;line-height:1}
+    .status-line{margin-top:8px;color:var(--muted);font-size:15px}
+    .serve-receive{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .pill{border-radius:14px;padding:10px;border:1px solid var(--line);font-weight:850}
+    .pill.server{background:rgba(34,197,94,.14);color:#dcfce7;border-color:rgba(34,197,94,.45)}
+    .pill.receiver{background:rgba(250,204,21,.14);color:#fef9c3;border-color:rgba(250,204,21,.45)}
+    .winner{display:none;margin-bottom:10px;padding:14px;border-radius:16px;background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.45);text-align:center;font-weight:950;font-size:20px}
+    .winner.show{display:block}
+    .score-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .team-card{background:var(--panel);border:2px solid transparent;border-radius:20px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+    .team-card.serving{border-color:var(--green)}
+    .team-name{font-size:clamp(18px,4.5vw,24px);font-weight:950}
+    .score{font-size:clamp(64px,22vw,122px);line-height:.92;font-weight:950;margin:6px 0}
+    .team-a .score{color:#93c5fd}.team-b .score{color:#fcd34d}
+    .court{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .slot{min-height:82px;border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;flex-direction:column;justify-content:center;background:rgba(255,255,255,.035)}
+    .slot .label{font-size:13px;color:var(--muted);font-weight:800}
+    .slot .player{margin-top:5px;font-weight:950;font-size:17px;word-break:break-word}
+    .slot.server{outline:3px solid var(--green);background:rgba(34,197,94,.10)}
+    .slot.receiver{outline:3px solid var(--yellow);background:rgba(250,204,21,.10)}
+    .court-note{margin-top:8px;color:var(--muted);font-size:13px;line-height:1.35}
+    .net{background:rgba(255,255,255,.08);border:1px dashed rgba(255,255,255,.22);border-radius:12px;text-align:center;padding:7px;margin:0 0 10px;font-weight:900;letter-spacing:2px;color:#e2e8f0}
+    .rally-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .rally-btn{border:0;border-radius:18px;min-height:104px;padding:12px 8px;color:white;font-weight:950;font-size:clamp(18px,4.5vw,25px);box-shadow:var(--shadow);touch-action:manipulation}
+    .rally-btn:active{transform:scale(.985)}
+    .rally-a{background:linear-gradient(145deg,#2563eb,#1d4ed8)}
+    .rally-b{background:linear-gradient(145deg,#d97706,#b45309)}
+    .rally-btn span{display:block;font-size:12px;opacity:.86;margin-top:6px}
+    .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+    .action-btn{min-height:52px;padding:8px}
+    .action-btn.warn{background:rgba(245,158,11,.15);color:#fde68a}
+    .action-btn.danger{background:rgba(239,68,68,.14);color:#fecaca}
+    .history{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:13px;box-shadow:var(--shadow)}
+    .history h2{margin:0 0 9px;font-size:17px}
+    .history-list{display:grid;gap:7px;max-height:220px;overflow:auto}
+    .history-item{background:rgba(255,255,255,.045);border-radius:10px;padding:9px;color:var(--muted);font-size:14px;line-height:1.35}
+    .empty{color:#94a3b8;font-style:italic}
+    dialog{width:min(calc(100% - 22px),540px);border:1px solid var(--line);border-radius:20px;background:#111827;color:var(--text);padding:0;box-shadow:0 25px 75px rgba(0,0,0,.6)}
+    dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(3px)}
+    .dialog-body{padding:18px}.dialog-body h2{margin:0 0 14px}
+    .form-grid{display:grid;gap:11px}
+    label{display:grid;gap:6px;color:var(--muted);font-size:14px;font-weight:750}
+    input,select{width:100%;border:1px solid var(--line);background:#0f172a;color:var(--text);border-radius:12px;padding:12px;font-size:16px}
+    .dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+    .dialog-actions button{border-radius:12px;min-height:48px;font-weight:900;border:0}
+    .primary{background:var(--green);color:#052e16}.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)!important}
+    @media(max-width:440px){
+      .actions{grid-template-columns:1fr 1fr}.actions .danger{grid-column:span 2}
+      .team-card{padding:10px 7px}.slot{min-height:76px;padding:7px}.slot .player{font-size:15px}
+    }
+  </style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+    <h1>🏓 Trọng tài Pickleball</h1>
+    <button id="settingsBtn" type="button" class="small-btn">Cài đặt</button>
+  </div>
+
+  <div id="winnerBox" class="winner"></div>
+
+  <section class="status">
+    <div id="callScore" class="call">0 - 0 - 2</div>
+    <div id="statusLine" class="status-line">Bắt đầu trận đấu</div>
+    <div class="serve-receive">
+      <div id="serverPill" class="pill server">🎾 Giao: --</div>
+      <div id="receiverPill" class="pill receiver">📥 Nhận: --</div>
+    </div>
+  </section>
+
+  <section class="score-grid">
+    <article id="teamACard" class="team-card team-a serving">
+      <div id="teamAName" class="team-name">ĐỘI A</div>
+      <div id="teamAScore" class="score">0</div>
+      <div class="court">
+        <div id="A1" class="slot"><div class="label">Ô 1</div><div class="player"></div></div>
+        <div id="A2" class="slot"><div class="label">Ô 2</div><div class="player"></div></div>
+      </div>
+      <div class="court-note">Ô 1 = bên phải • Ô 2 = bên trái</div>
+    </article>
+
+    <article id="teamBCard" class="team-card team-b">
+      <div id="teamBName" class="team-name">ĐỘI B</div>
+      <div id="teamBScore" class="score">0</div>
+      <div class="court">
+        <div id="B2" class="slot"><div class="label">Ô 2</div><div class="player"></div></div>
+        <div id="B1" class="slot"><div class="label">Ô 1</div><div class="player"></div></div>
+      </div>
+      <div class="court-note">Ô 1 = bên phải • Ô 2 = bên trái</div>
+    </article>
+  </section>
+
+  <div class="net">LƯỚI</div>
+
+  <section class="rally-buttons">
+    <button id="winA" type="button" class="rally-btn rally-a">ĐỘI A THẮNG PHA<span>Chạm một lần</span></button>
+    <button id="winB" type="button" class="rally-btn rally-b">ĐỘI B THẮNG PHA<span>Chạm một lần</span></button>
+  </section>
+
+  <section class="actions">
+    <button id="undoBtn" type="button" class="action-btn">↶ Hoàn tác</button>
+    <button id="speakBtn" type="button" class="action-btn">🔊 Đọc điểm</button>
+    <button id="manualBtn" type="button" class="action-btn">✎ Sửa</button>
+    <button id="swapBtn" type="button" class="action-btn warn">⇄ Đổi đầu sân</button>
+    <button id="resetBtn" type="button" class="action-btn danger">⟲ Trận mới</button>
+  </section>
+
+  <section class="history">
+    <h2>Lịch sử pha bóng</h2>
+    <div id="historyList" class="history-list"></div>
+  </section>
+</main>
+
+<dialog id="settingsDialog">
+  <div class="dialog-body">
+    <h2>Cài đặt trận đấu</h2>
+    <div class="form-grid">
+      <label>Tên đội A<input id="inputTeamA" maxlength="24"></label>
+      <label>Người A1 — đứng Ô 1 lúc đầu<input id="inputA1" maxlength="24"></label>
+      <label>Người A2 — đứng Ô 2 lúc đầu<input id="inputA2" maxlength="24"></label>
+      <label>Tên đội B<input id="inputTeamB" maxlength="24"></label>
+      <label>Người B1 — đứng Ô 1 lúc đầu<input id="inputB1" maxlength="24"></label>
+      <label>Người B2 — đứng Ô 2 lúc đầu<input id="inputB2" maxlength="24"></label>
+      <label>Điểm kết thúc
+        <select id="inputTarget"><option value="11">11 điểm</option><option value="15">15 điểm</option><option value="21">21 điểm</option></select>
+      </label>
+      <label>Đội giao đầu tiên
+        <select id="inputFirstServe"><option value="A">Đội A</option><option value="B">Đội B</option></select>
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button id="closeSettings" class="secondary">Đóng</button>
+      <button id="saveSettings" class="primary">Lưu và tạo trận mới</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="manualDialog">
+  <div class="dialog-body">
+    <h2>Sửa trạng thái</h2>
+    <div class="form-grid">
+      <label>Điểm đội A<input id="manualScoreA" type="number" min="0" max="99"></label>
+      <label>Điểm đội B<input id="manualScoreB" type="number" min="0" max="99"></label>
+      <label>Đội đang giao
+        <select id="manualServingTeam"><option value="A">Đội A</option><option value="B">Đội B</option></select>
+      </label>
+      <label>Người đang giao
+        <select id="manualServerPlayer"></select>
+      </label>
+      <label>Người giao số
+        <select id="manualServerNumber"><option value="1">Số 1</option><option value="2">Số 2</option></select>
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button id="closeManual" class="secondary">Hủy</button>
+      <button id="saveManual" class="primary">Áp dụng</button>
+    </div>
+  </div>
+</dialog>
+
+
+<dialog id="resetDialog">
+  <div class="dialog-body">
+    <h2>Bắt đầu trận mới?</h2>
+    <p style="color:#cbd5e1;line-height:1.5;margin:0">
+      Điểm số và lịch sử pha bóng hiện tại sẽ bị xóa. Tên đội và tên người chơi vẫn được giữ lại.
+    </p>
+    <div class="dialog-actions">
+      <button id="cancelReset" class="secondary" type="button">Hủy</button>
+      <button id="confirmReset" class="primary" type="button">Tạo trận mới</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const STORAGE_KEY="pickleball_referee_players_v2";
+let locked=false;
+
+const defaultState={
+  teamA:{name:"ĐỘI A",score:0,players:{p1:"Mạnh",p2:"Quang"},initialRight:"p1"},
+  teamB:{name:"ĐỘI B",score:0,players:{p1:"Tú",p2:"Hiếu"},initialRight:"p1"},
+  servingTeam:"A",
+  matchFirstServingTeam:"A",
+  serverPlayer:"p1",
+  serverNumber:2,
+  firstServerException:true,
+  targetScore:11,
+  winner:null,
+  courtSwapped:false,
+  history:[],
+  undoStack:[]
+};
+
+let state=loadState();
+
+function clone(v){return JSON.parse(JSON.stringify(v))}
+function loadState(){
+  try{
+    const saved=localStorage.getItem(STORAGE_KEY);
+    return saved?{...clone(defaultState),...JSON.parse(saved)}:clone(defaultState);
+  }catch{return clone(defaultState)}
+}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function team(k){return k==="A"?state.teamA:state.teamB}
+function other(k){return k==="A"?"B":"A"}
+function playerName(teamKey,playerKey){return team(teamKey).players[playerKey]}
+function teammate(playerKey){return playerKey==="p1"?"p2":"p1"}
+
+function positionMap(teamKey){
+  const t=team(teamKey);
+  const even=t.score%2===0;
+  const rightPlayer=even?t.initialRight:teammate(t.initialRight);
+  return {1:rightPlayer,2:teammate(rightPlayer)};
+}
+
+function serverCourt(){
+  const map=positionMap(state.servingTeam);
+  return map[1]===state.serverPlayer?1:2;
+}
+
+function receiverInfo(){
+  const receiverTeam=other(state.servingTeam);
+  const diagonalCourt=serverCourt()===1?1:2;
+  const map=positionMap(receiverTeam);
+  const receiverPlayer=map[diagonalCourt];
+  return {team:receiverTeam,player:receiverPlayer,court:diagonalCourt};
+}
+
+function scoreCall(){
+  const s=team(state.servingTeam).score;
+  const r=team(other(state.servingTeam)).score;
+  return `${s} - ${r} - ${state.serverNumber}`;
+}
+
+function pushUndo(){
+  const snap=clone(state);snap.undoStack=[];
+  state.undoStack.push(snap);
+  if(state.undoStack.length>60)state.undoStack.shift();
+}
+function addHistory(text){
+  state.history.unshift({text,time:new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})});
+  if(state.history.length>50)state.history.pop();
+}
+function vibrate(p=30){if(navigator.vibrate)navigator.vibrate(p)}
+
+function checkWinner(){
+  const a=state.teamA.score,b=state.teamB.score;
+  state.winner=((a>=state.targetScore||b>=state.targetScore)&&Math.abs(a-b)>=2)?(a>b?"A":"B"):null;
+}
+
+function newServiceForTeam(teamKey){
+  state.servingTeam=teamKey;
+  state.serverNumber=1;
+  const map=positionMap(teamKey);
+  state.serverPlayer=map[1];
+}
+
+function rallyWon(winner){
+  if(locked||state.winner)return;
+  locked=true;setTimeout(()=>locked=false,420);
+  pushUndo();
+
+  const servingBefore=state.servingTeam;
+  const serverBeforeName=playerName(servingBefore,state.serverPlayer);
+
+  if(winner===state.servingTeam){
+    team(winner).score+=1;
+    addHistory(`${team(winner).name} ghi điểm. ${serverBeforeName} tiếp tục giao. Đọc: ${scoreCall()}.`);
+    vibrate(35);
+  }else{
+    if(state.firstServerException){
+      state.firstServerException=false;
+      newServiceForTeam(other(state.servingTeam));
+      addHistory(`Side-out sang ${team(state.servingTeam).name}. ${playerName(state.servingTeam,state.serverPlayer)} giao số 1.`);
+      vibrate([30,40,30]);
+    }else if(state.serverNumber===1){
+      state.serverNumber=2;
+      state.serverPlayer=teammate(state.serverPlayer);
+      addHistory(`${team(servingBefore).name} chuyển sang người giao số 2: ${playerName(servingBefore,state.serverPlayer)}.`);
+      vibrate([25,35,25]);
+    }else{
+      newServiceForTeam(other(state.servingTeam));
+      addHistory(`Side-out sang ${team(state.servingTeam).name}. ${playerName(state.servingTeam,state.serverPlayer)} giao số 1.`);
+      vibrate([30,40,30]);
+    }
+  }
+
+  checkWinner();saveState();render();
+}
+
+function speakScore(){
+  if(!("speechSynthesis" in window))return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(scoreCall().replaceAll("-",","));
+  u.lang="vi-VN";u.rate=.9;speechSynthesis.speak(u);
+}
+
+function undo(){
+  if(!state.undoStack.length){alert("Chưa có pha bóng để hoàn tác.");return}
+  const prev=state.undoStack.pop(),remaining=state.undoStack;
+  state=prev;state.undoStack=remaining;
+  addHistory("Đã hoàn tác pha bóng gần nhất.");
+  saveState();render();vibrate(25);
+}
+
+function openResetDialog(){
+  const dialog=document.getElementById("resetDialog");
+  if(typeof dialog.showModal==="function"){
+    dialog.showModal();
+  }else{
+    dialog.setAttribute("open","");
+  }
+}
+
+function closeResetDialog(){
+  const dialog=document.getElementById("resetDialog");
+  if(typeof dialog.close==="function"){
+    dialog.close();
+  }else{
+    dialog.removeAttribute("open");
+  }
+}
+
+function resetMatch(){
+  const current=clone(state);
+  const firstServingTeam=current.matchFirstServingTeam||"A";
+
+  state=clone(defaultState);
+  state.teamA=clone(current.teamA);
+  state.teamB=clone(current.teamB);
+  state.teamA.score=0;
+  state.teamB.score=0;
+  state.targetScore=current.targetScore;
+  state.servingTeam=firstServingTeam;
+  state.matchFirstServingTeam=firstServingTeam;
+  state.serverNumber=2;
+  state.firstServerException=true;
+  state.winner=null;
+  state.history=[];
+  state.undoStack=[];
+  state.courtSwapped=false;
+  state.serverPlayer=positionMap(state.servingTeam)[1];
+
+  addHistory(`Bắt đầu trận mới. ${team(state.servingTeam).name} giao đầu, tỷ số 0-0-2.`);
+  saveState();
+  render();
+  closeResetDialog();
+  vibrate([35,45,35]);
+}
+
+function setSlot(teamKey,court){
+  const map=positionMap(teamKey);
+  const playerKey=map[court];
+  const el=document.getElementById(teamKey+court);
+  el.querySelector(".player").textContent=playerName(teamKey,playerKey);
+  el.classList.remove("server","receiver");
+  if(teamKey===state.servingTeam&&playerKey===state.serverPlayer)el.classList.add("server");
+  const rec=receiverInfo();
+  if(teamKey===rec.team&&playerKey===rec.player)el.classList.add("receiver");
+}
+
+function render(){
+  document.getElementById("teamAName").textContent=state.teamA.name;
+  document.getElementById("teamBName").textContent=state.teamB.name;
+  document.getElementById("teamAScore").textContent=state.teamA.score;
+  document.getElementById("teamBScore").textContent=state.teamB.score;
+  document.getElementById("callScore").textContent=scoreCall();
+
+  setSlot("A",1);setSlot("A",2);setSlot("B",1);setSlot("B",2);
+
+  const serverName=playerName(state.servingTeam,state.serverPlayer);
+  const rec=receiverInfo();
+  const receiverName=playerName(rec.team,rec.player);
+
+  document.getElementById("statusLine").textContent=
+    `${team(state.servingTeam).name} đang giao • Người giao số ${state.serverNumber} • Giao từ Ô ${serverCourt()}`;
+  document.getElementById("serverPill").textContent=`🎾 Giao: ${serverName} (Ô ${serverCourt()})`;
+  document.getElementById("receiverPill").textContent=`📥 Nhận: ${receiverName} (Ô ${rec.court})`;
+
+  document.getElementById("teamACard").classList.toggle("serving",state.servingTeam==="A");
+  document.getElementById("teamBCard").classList.toggle("serving",state.servingTeam==="B");
+  document.getElementById("winA").firstChild.nodeValue=state.teamA.name+" THẮNG PHA";
+  document.getElementById("winB").firstChild.nodeValue=state.teamB.name+" THẮNG PHA";
+
+  const list=document.getElementById("historyList");list.innerHTML="";
+  if(!state.history.length)list.innerHTML='<div class="empty">Chưa có pha bóng nào.</div>';
+  else state.history.forEach((it,i)=>{
+    const row=document.createElement("div");row.className="history-item";
+    row.textContent=`#${state.history.length-i} • ${it.time} — ${it.text}`;list.appendChild(row);
+  });
+
+  const wb=document.getElementById("winnerBox");
+  if(state.winner){wb.classList.add("show");wb.textContent=`🏆 ${team(state.winner).name} thắng ${state.teamA.score} - ${state.teamB.score}`}
+  else{wb.classList.remove("show");wb.textContent=""}
+  document.getElementById("winA").disabled=!!state.winner;
+  document.getElementById("winB").disabled=!!state.winner;
+}
+
+const settingsDialog=document.getElementById("settingsDialog");
+const manualDialog=document.getElementById("manualDialog");
+
+document.getElementById("settingsBtn").onclick=()=>{
+  document.getElementById("inputTeamA").value=state.teamA.name;
+  document.getElementById("inputA1").value=state.teamA.players.p1;
+  document.getElementById("inputA2").value=state.teamA.players.p2;
+  document.getElementById("inputTeamB").value=state.teamB.name;
+  document.getElementById("inputB1").value=state.teamB.players.p1;
+  document.getElementById("inputB2").value=state.teamB.players.p2;
+  document.getElementById("inputTarget").value=String(state.targetScore);
+  document.getElementById("inputFirstServe").value=state.matchFirstServingTeam||state.servingTeam;
+  settingsDialog.showModal();
+};
+document.getElementById("closeSettings").onclick=()=>settingsDialog.close();
+document.getElementById("saveSettings").onclick=()=>{
+  state=clone(defaultState);
+  state.teamA.name=document.getElementById("inputTeamA").value.trim()||"ĐỘI A";
+  state.teamA.players.p1=document.getElementById("inputA1").value.trim()||"A1";
+  state.teamA.players.p2=document.getElementById("inputA2").value.trim()||"A2";
+  state.teamB.name=document.getElementById("inputTeamB").value.trim()||"ĐỘI B";
+  state.teamB.players.p1=document.getElementById("inputB1").value.trim()||"B1";
+  state.teamB.players.p2=document.getElementById("inputB2").value.trim()||"B2";
+  state.targetScore=Number(document.getElementById("inputTarget").value);
+  state.servingTeam=document.getElementById("inputFirstServe").value;
+  state.matchFirstServingTeam=state.servingTeam;
+  state.serverPlayer=positionMap(state.servingTeam)[1];
+  state.serverNumber=2;state.firstServerException=true;
+  addHistory(`Tạo trận mới. ${team(state.servingTeam).name} giao đầu, tỷ số 0-0-2.`);
+  saveState();render();settingsDialog.close();
+};
+
+function populateManualServers(){
+  const tk=manualServingTeam.value;
+  manualServerPlayer.innerHTML="";
+  ["p1","p2"].forEach(pk=>{
+    const o=document.createElement("option");o.value=pk;o.textContent=playerName(tk,pk);manualServerPlayer.appendChild(o);
+  });
+}
+document.getElementById("manualBtn").onclick=()=>{
+  manualScoreA.value=state.teamA.score;manualScoreB.value=state.teamB.score;
+  manualServingTeam.value=state.servingTeam;populateManualServers();
+  manualServerPlayer.value=state.serverPlayer;manualServerNumber.value=String(state.serverNumber);
+  manualDialog.showModal();
+};
+manualServingTeam.onchange=populateManualServers;
+document.getElementById("closeManual").onclick=()=>manualDialog.close();
+document.getElementById("saveManual").onclick=()=>{
+  if(!confirm("Áp dụng trạng thái thủ công?"))return;
+  pushUndo();
+  state.teamA.score=Math.max(0,Number(manualScoreA.value)||0);
+  state.teamB.score=Math.max(0,Number(manualScoreB.value)||0);
+  state.servingTeam=manualServingTeam.value;
+  state.serverPlayer=manualServerPlayer.value;
+  state.serverNumber=Number(manualServerNumber.value);
+  state.firstServerException=false;
+  addHistory(`Sửa thủ công: ${state.teamA.score}-${state.teamB.score}; ${playerName(state.servingTeam,state.serverPlayer)} giao số ${state.serverNumber}.`);
+  checkWinner();saveState();render();manualDialog.close();
+};
+
+document.getElementById("winA").onclick=()=>rallyWon("A");
+document.getElementById("winB").onclick=()=>rallyWon("B");
+document.getElementById("undoBtn").onclick=undo;
+document.getElementById("speakBtn").onclick=speakScore;
+document.getElementById("resetBtn").addEventListener("click", openResetDialog);
+document.getElementById("cancelReset").addEventListener("click", closeResetDialog);
+document.getElementById("confirmReset").addEventListener("click", resetMatch);
+document.getElementById("swapBtn").onclick=()=>{
+  state.courtSwapped=!state.courtSwapped;addHistory("Đã ghi nhận đổi đầu sân.");saveState();render();vibrate(30);alert("Đã ghi nhận đổi đầu sân.");
+};
+
+render();
+</script>
+</body>
+</html>
