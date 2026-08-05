@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PickRef" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <title>Trọng tài Pickleball</title>
   <style>
     :root{
@@ -57,6 +62,7 @@
     .history h2{margin:0 0 9px;font-size:17px}
     .history-list{display:grid;gap:7px;max-height:220px;overflow:auto}
     .history-item{background:rgba(255,255,255,.045);border-radius:10px;padding:9px;color:var(--muted);font-size:14px;line-height:1.35}
+    .history-item.summary{background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);color:#ecfdf5;white-space:pre-line;font-weight:700}
     .empty{color:#94a3b8;font-style:italic}
     dialog{width:min(calc(100% - 22px),540px);border:1px solid var(--line);border-radius:20px;background:#111827;color:var(--text);padding:0;box-shadow:0 25px 75px rgba(0,0,0,.6)}
     dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(3px)}
@@ -125,6 +131,7 @@
     <button id="speakBtn" type="button" class="action-btn">🔊 Đọc điểm</button>
     <button id="manualBtn" type="button" class="action-btn">✎ Sửa</button>
     <button id="swapBtn" type="button" class="action-btn warn">⇄ Đổi đầu sân</button>
+    <button id="exportPdfBtn" type="button" class="action-btn" style="display:none">📄 Xuất kết quả PDF</button>
     <button id="resetBtn" type="button" class="action-btn danger">⟲ Trận mới</button>
   </section>
 
@@ -138,6 +145,33 @@
   <div class="dialog-body">
     <h2>Cài đặt trận đấu</h2>
     <div class="form-grid">
+      <label>Tên CLB
+        <input id="inputClubName" maxlength="60" placeholder="Ví dụ: Pick Home">
+      </label>
+      <label>Tên giải đấu
+        <input id="inputTournamentName" maxlength="80" placeholder="Ví dụ: Giải nội bộ tháng 8">
+      </label>
+      <label>Tên trận
+        <input id="inputMatchName" maxlength="60" placeholder="Ví dụ: Tứ kết 1">
+      </label>
+      <label>Trận số
+        <input id="inputMatchNumber" maxlength="20" placeholder="Ví dụ: 12">
+      </label>
+      <label>Sân số
+        <input id="inputCourtNumber" maxlength="20" placeholder="Ví dụ: 3">
+      </label>
+      <label>Địa điểm
+        <input id="inputVenue" maxlength="100" placeholder="Ví dụ: Sân Pick Home">
+      </label>
+      <label>Tên trọng tài
+        <input id="inputRefereeName" maxlength="60">
+      </label>
+      <label>Tên đại diện VĐV
+        <input id="inputRepresentativeName" maxlength="60">
+      </label>
+      <label>Tên Chủ tịch CLB
+        <input id="inputPresidentName" maxlength="60">
+      </label>
       <label>Tên đội A<input id="inputTeamA" maxlength="24"></label>
       <label>Người A1 — đứng Ô 1 lúc đầu<input id="inputA1" maxlength="24"></label>
       <label>Người A2 — đứng Ô 2 lúc đầu<input id="inputA2" maxlength="24"></label>
@@ -225,11 +259,29 @@ const defaultState={
   capScore:15,
   winner:null,
   courtSwapped:false,
+  clubInfo:{
+    clubName:"",
+    tournamentName:"",
+    matchName:"",
+    matchNumber:"",
+    courtNumber:"",
+    venue:"",
+    refereeName:"",
+    representativeName:"",
+    presidentName:""
+  },
+  stats:null,
+  summaryAdded:false,
   history:[],
   undoStack:[]
 };
 
 let state=loadState();
+ensureStats();
+if(state.stats.A.serviceTurns===0&&state.stats.B.serviceTurns===0){
+  registerServiceTurn(state.servingTeam,state.serverPlayer);
+  saveState();
+}
 
 function clone(v){return JSON.parse(JSON.stringify(v))}
 function loadState(){
@@ -238,12 +290,18 @@ function loadState(){
     if(!saved)return clone(defaultState);
     const parsed=JSON.parse(saved);
     const normalizedMode=parsed.winMode==="winByTwo"?"winByTwoWithCap":(parsed.winMode||"winByTwoWithCap");
-    return {
+    const loaded={
       ...clone(defaultState),
       ...parsed,
+      clubInfo:{
+        ...clone(defaultState.clubInfo),
+        ...(parsed.clubInfo||{})
+      },
       winMode:normalizedMode,
       capScore:Number(parsed.capScore)||15
     };
+    if(!loaded.stats)loaded.stats=createEmptyStats();
+    return loaded;
   }catch{return clone(defaultState)}
 }
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
@@ -251,6 +309,90 @@ function team(k){return k==="A"?state.teamA:state.teamB}
 function other(k){return k==="A"?"B":"A"}
 function playerName(teamKey,playerKey){return team(teamKey).players[playerKey]}
 function teammate(playerKey){return playerKey==="p1"?"p2":"p1"}
+
+function createEmptyStats(){
+  return {
+    A:{
+      serviceTurns:0,
+      serviceRallies:0,
+      pointsOnServe:0,
+      players:{
+        p1:{serviceTurns:0,serviceRallies:0,pointsOnServe:0},
+        p2:{serviceTurns:0,serviceRallies:0,pointsOnServe:0}
+      }
+    },
+    B:{
+      serviceTurns:0,
+      serviceRallies:0,
+      pointsOnServe:0,
+      players:{
+        p1:{serviceTurns:0,serviceRallies:0,pointsOnServe:0},
+        p2:{serviceTurns:0,serviceRallies:0,pointsOnServe:0}
+      }
+    }
+  };
+}
+
+function ensureStats(){
+  if(!state.stats)state.stats=createEmptyStats();
+  ["A","B"].forEach(tk=>{
+    if(!state.stats[tk])state.stats[tk]=createEmptyStats()[tk];
+    if(!state.stats[tk].players)state.stats[tk].players=createEmptyStats()[tk].players;
+  });
+}
+
+function registerServiceTurn(teamKey,playerKey){
+  ensureStats();
+  state.stats[teamKey].serviceTurns+=1;
+  state.stats[teamKey].players[playerKey].serviceTurns+=1;
+}
+
+function registerServiceRally(teamKey,playerKey,pointWon){
+  ensureStats();
+  state.stats[teamKey].serviceRallies+=1;
+  state.stats[teamKey].players[playerKey].serviceRallies+=1;
+  if(pointWon){
+    state.stats[teamKey].pointsOnServe+=1;
+    state.stats[teamKey].players[playerKey].pointsOnServe+=1;
+  }
+}
+
+function percent(points,total){
+  return total?Math.round(points*100/total):0;
+}
+
+function buildMatchSummary(){
+  ensureStats();
+  const lines=[];
+  lines.push("📊 THỐNG KÊ KẾT THÚC TRẬN");
+  lines.push(`${state.teamA.name} ${state.teamA.score} - ${state.teamB.score} ${state.teamB.name}`);
+
+  ["A","B"].forEach(tk=>{
+    const t=team(tk);
+    const s=state.stats[tk];
+    lines.push("");
+    lines.push(`${t.name}:`);
+    lines.push(`• Tổng lượt cầm giao: ${s.serviceTurns}`);
+    lines.push(`• Tổng pha giao: ${s.serviceRallies}`);
+    lines.push(`• Điểm ghi khi giao: ${s.pointsOnServe}/${s.serviceRallies} (${percent(s.pointsOnServe,s.serviceRallies)}%)`);
+    ["p1","p2"].forEach(pk=>{
+      const ps=s.players[pk];
+      lines.push(`• ${playerName(tk,pk)}: ${ps.serviceTurns} lượt cầm giao; ${ps.pointsOnServe}/${ps.serviceRallies} pha giao ăn điểm (${percent(ps.pointsOnServe,ps.serviceRallies)}%)`);
+    });
+  });
+
+  return lines.join("\n");
+}
+
+function addFinalSummary(){
+  if(!state.winner||state.summaryAdded)return;
+  state.history.unshift({
+    text:buildMatchSummary(),
+    time:new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}),
+    type:"summary"
+  });
+  state.summaryAdded=true;
+}
 
 function positionMap(teamKey){
   const t=team(teamKey);
@@ -317,6 +459,7 @@ function newServiceForTeam(teamKey){
   state.serverNumber=1;
   const map=positionMap(teamKey);
   state.serverPlayer=map[1];
+  registerServiceTurn(state.servingTeam,state.serverPlayer);
 }
 
 function rallyWon(winner){
@@ -325,7 +468,10 @@ function rallyWon(winner){
   pushUndo();
 
   const servingBefore=state.servingTeam;
-  const serverBeforeName=playerName(servingBefore,state.serverPlayer);
+  const serverBefore=state.serverPlayer;
+  const serverBeforeName=playerName(servingBefore,serverBefore);
+
+  registerServiceRally(servingBefore,serverBefore,winner===servingBefore);
 
   if(winner===state.servingTeam){
     team(winner).score+=1;
@@ -340,6 +486,7 @@ function rallyWon(winner){
     }else if(state.serverNumber===1){
       state.serverNumber=2;
       state.serverPlayer=teammate(state.serverPlayer);
+      registerServiceTurn(state.servingTeam,state.serverPlayer);
       addHistory(`${team(servingBefore).name} chuyển sang người giao số 2: ${playerName(servingBefore,state.serverPlayer)}.`);
       vibrate([25,35,25]);
     }else{
@@ -349,34 +496,289 @@ function rallyWon(winner){
     }
   }
 
-  checkWinner();saveState();render();
+  checkWinner();
+  addFinalSummary();
+  saveState();
+  render();
+}
+
+function pairName(teamKey){
+  return `${playerName(teamKey,"p1")} - ${playerName(teamKey,"p2")}`;
+}
+
+function resultAnnouncementText(){
+  ensureStats();
+  if(!state.winner)return "";
+
+  const winnerKey=state.winner;
+  const loserKey=other(winnerKey);
+  const winnerTeam=team(winnerKey);
+  const loserTeam=team(loserKey);
+  const winnerStats=state.stats[winnerKey];
+  const loserStats=state.stats[loserKey];
+
+  const clubPrefix=state.clubInfo&&state.clubInfo.clubName
+    ?`Kết quả trận đấu của Câu lạc bộ ${state.clubInfo.clubName}. `
+    :`Kết quả trận đấu. `;
+
+  return (
+    clubPrefix+
+    `Xin chúc mừng đôi ${pairName(winnerKey)} đã giành chiến thắng trước đôi ${pairName(loserKey)} `+
+    `với tỷ số ${winnerTeam.score} - ${loserTeam.score}. `+
+    `Đội ${pairName(winnerKey)} có tổng cộng ${winnerStats.serviceRallies} pha giao bóng, `+
+    `ghi được ${winnerStats.pointsOnServe} điểm khi giao. `+
+    `Đội ${pairName(loserKey)} có tổng cộng ${loserStats.serviceRallies} pha giao bóng, `+
+    `ghi được ${loserStats.pointsOnServe} điểm khi giao. `+
+    `Xin cảm ơn các vận động viên.`
+  );
 }
 
 function speakScore(){
   if(!("speechSynthesis" in window))return;
 
   speechSynthesis.cancel();
+  ensureStats();
 
-  const serverName=playerName(state.servingTeam,state.serverPlayer);
-  const serveCourt=serverCourt();
-  const rec=receiverInfo();
-  const receiverName=playerName(rec.team,rec.player);
+  let text="";
 
-  const spokenScore=scoreCall()
-    .split("-")
-    .map(part=>part.trim())
-    .join(", ");
+  if(state.winner){
+    text=resultAnnouncementText();
+  }else{
+    const serverName=playerName(state.servingTeam,state.serverPlayer);
+    const serveCourt=serverCourt();
+    const rec=receiverInfo();
+    const receiverName=playerName(rec.team,rec.player);
 
-  const text=
-    `Tỷ số ${spokenScore}. `+
-    `Lượt tới, ${serverName} giao bóng ở ô ${serveCourt}. `+
-    `${receiverName} nhận bóng ở ô ${rec.court}.`;
+    const spokenScore=scoreCall()
+      .split("-")
+      .map(part=>part.trim())
+      .join(", ");
+
+    text=
+      `Tỷ số ${spokenScore}. `+
+      `Lượt tới, ${serverName} giao bóng ở ô ${serveCourt}. `+
+      `${receiverName} nhận bóng ở ô ${rec.court}.`;
+  }
 
   const u=new SpeechSynthesisUtterance(text);
   u.lang="vi-VN";
   u.rate=.88;
   u.pitch=1;
   speechSynthesis.speak(u);
+}
+
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g,char=>({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  })[char]);
+}
+
+function stripVietnamese(value){
+  return String(value||"")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/đ/g,"d")
+    .replace(/Đ/g,"D");
+}
+
+function pdfEscape(value){
+  return stripVietnamese(value)
+    .replace(/\\/g,"\\\\")
+    .replace(/\(/g,"\\(")
+    .replace(/\)/g,"\\)");
+}
+
+function buildSimplePdf(lines){
+  const pageWidth=595;
+  const pageHeight=842;
+  const left=42;
+  const top=800;
+  const lineHeight=16;
+  const maxLines=44;
+  const pages=[];
+
+  for(let i=0;i<lines.length;i+=maxLines){
+    pages.push(lines.slice(i,i+maxLines));
+  }
+
+  const objects=[];
+  const addObject=content=>{
+    objects.push(content);
+    return objects.length;
+  };
+
+  const catalogId=addObject("");
+  const pagesId=addObject("");
+  const fontId=addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const boldFontId=addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+  const pageIds=[];
+
+  pages.forEach((pageLines,pageIndex)=>{
+    let stream="BT\n";
+    stream+=`/F1 11 Tf\n`;
+    stream+=`${left} ${top} Td\n`;
+
+    pageLines.forEach((line,index)=>{
+      const isTitle=line.startsWith("##");
+      const isHeading=line.startsWith("# ");
+      let text=line.replace(/^##\s*/,"").replace(/^#\s*/,"");
+      if(isTitle){
+        stream+="/F2 16 Tf\n";
+      }else if(isHeading){
+        stream+="/F2 12 Tf\n";
+      }else{
+        stream+="/F1 10 Tf\n";
+      }
+      if(index>0)stream+=`0 -${lineHeight} Td\n`;
+      stream+=`(${pdfEscape(text)}) Tj\n`;
+    });
+
+    stream+="ET";
+    const contentId=addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    const pageId=addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] `+
+      `/Resources << /Font << /F1 ${fontId} 0 R /F2 ${boldFontId} 0 R >> >> `+
+      `/Contents ${contentId} 0 R >>`
+    );
+    pageIds.push(pageId);
+  });
+
+  objects[catalogId-1]=`<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[pagesId-1]=`<< /Type /Pages /Kids [${pageIds.map(id=>`${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+
+  let pdf="%PDF-1.4\n";
+  const offsets=[0];
+
+  objects.forEach((obj,index)=>{
+    offsets.push(pdf.length);
+    pdf+=`${index+1} 0 obj\n${obj}\nendobj\n`;
+  });
+
+  const xrefOffset=pdf.length;
+  pdf+=`xref\n0 ${objects.length+1}\n`;
+  pdf+="0000000000 65535 f \n";
+  for(let i=1;i<offsets.length;i++){
+    pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
+  }
+  pdf+=`trailer\n<< /Size ${objects.length+1} /Root ${catalogId} 0 R >>\n`;
+  pdf+=`startxref\n${xrefOffset}\n%%EOF`;
+
+  return new Blob([pdf],{type:"application/pdf"});
+}
+
+async function exportResultPdf(){
+  if(!state.winner){
+    alert("Chi co the xuat ket qua sau khi tran dau ket thuc.");
+    return;
+  }
+
+  ensureStats();
+
+  const button=document.getElementById("exportPdfBtn");
+  const oldText=button.textContent;
+  button.disabled=true;
+  button.textContent="Dang tao PDF...";
+
+  try{
+    const winnerKey=state.winner;
+    const loserKey=other(winnerKey);
+    const winnerTeam=team(winnerKey);
+    const loserTeam=team(loserKey);
+    const info=state.clubInfo||{};
+    const totalRallies=state.stats.A.serviceRallies+state.stats.B.serviceRallies;
+
+    const lines=[
+      "## BIEN BAN KET QUA TRAN DAU PICKLEBALL",
+      info.clubName?`# CAU LAC BO: ${info.clubName}`:"",
+      info.tournamentName?`Giai dau: ${info.tournamentName}`:"",
+      info.matchNumber?`Tran so: ${info.matchNumber}`:"",
+      info.matchName?`Ten tran: ${info.matchName}`:"",
+      info.courtNumber?`San so: ${info.courtNumber}`:"",
+      info.venue?`Dia diem: ${info.venue}`:"",
+      `Thoi gian xuat: ${new Date().toLocaleString("vi-VN")}`,
+      "",
+      "# KET QUA",
+      `Doi chien thang: ${pairName(winnerKey)}`,
+      `Ty so: ${winnerTeam.score} - ${loserTeam.score}`,
+      `${pairName(winnerKey)} thang ${pairName(loserKey)}`,
+      "",
+      stripVietnamese(resultAnnouncementText()),
+      "",
+      "# THONG KE DOI A",
+      `Doi: ${pairName("A")}`,
+      `Tong luot cam giao: ${state.stats.A.serviceTurns}`,
+      `Tong pha giao bong: ${state.stats.A.serviceRallies}`,
+      `Diem ghi khi giao: ${state.stats.A.pointsOnServe}`,
+      `Hieu suat: ${percent(state.stats.A.pointsOnServe,state.stats.A.serviceRallies)}%`,
+      "",
+      "# THONG KE DOI B",
+      `Doi: ${pairName("B")}`,
+      `Tong luot cam giao: ${state.stats.B.serviceTurns}`,
+      `Tong pha giao bong: ${state.stats.B.serviceRallies}`,
+      `Diem ghi khi giao: ${state.stats.B.pointsOnServe}`,
+      `Hieu suat: ${percent(state.stats.B.pointsOnServe,state.stats.B.serviceRallies)}%`,
+      "",
+      `Tong so pha giao bong toan tran: ${totalRallies}`,
+      "",
+      "# THONG KE TUNG VAN DONG VIEN"
+    ].filter(Boolean);
+
+    ["A","B"].forEach(teamKey=>{
+      ["p1","p2"].forEach(playerKey=>{
+        const ps=state.stats[teamKey].players[playerKey];
+        lines.push(
+          `${playerName(teamKey,playerKey)} - ${pairName(teamKey)}: `+
+          `${ps.serviceTurns} luot cam giao; ${ps.serviceRallies} pha giao; `+
+          `${ps.pointsOnServe} diem; hieu suat ${percent(ps.pointsOnServe,ps.serviceRallies)}%`
+        );
+      });
+    });
+
+    lines.push(
+      "",
+      "# XAC NHAN",
+      `Trong tai: ${info.refereeName||""}`,
+      `Dai dien VDV: ${info.representativeName||""}`,
+      `Chu tich CLB: ${info.presidentName||""}`,
+      "",
+      "Xin cam on cac van dong vien."
+    );
+
+    const blob=buildSimplePdf(lines);
+    const filename=
+      `Ket-qua-${safeFileName(pairName(winnerKey))}-vs-${safeFileName(pairName(loserKey))}.pdf`;
+    const file=new File([blob],filename,{type:"application/pdf"});
+
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({
+        title:"Ket qua tran dau Pickleball",
+        text:"Luu bien ban ket qua tran dau",
+        files:[file]
+      });
+    }else{
+      const url=URL.createObjectURL(blob);
+      const anchor=document.createElement("a");
+      anchor.href=url;
+      anchor.download=filename;
+      anchor.style.display="none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      setTimeout(()=>{
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      },2000);
+    }
+  }catch(error){
+    console.error(error);
+    alert("Khong the tai PDF. Tren iPhone, hay mo bang Safari va chon Luu vao Tep trong bang chia se.");
+  }finally{
+    button.disabled=false;
+    button.textContent=oldText;
+  }
 }
 
 function undo(){
@@ -412,6 +814,7 @@ function resetMatch(){
   state=clone(defaultState);
   state.teamA=clone(current.teamA);
   state.teamB=clone(current.teamB);
+  state.clubInfo=clone(current.clubInfo||defaultState.clubInfo);
   state.teamA.score=0;
   state.teamB.score=0;
   state.targetScore=current.targetScore;
@@ -422,10 +825,13 @@ function resetMatch(){
   state.serverNumber=2;
   state.firstServerException=true;
   state.winner=null;
+  state.stats=createEmptyStats();
+  state.summaryAdded=false;
   state.history=[];
   state.undoStack=[];
   state.courtSwapped=false;
   state.serverPlayer=positionMap(state.servingTeam)[1];
+  registerServiceTurn(state.servingTeam,state.serverPlayer);
 
   addHistory(`Bắt đầu trận mới. ${team(state.servingTeam).name} giao đầu, tỷ số 0-0-2.`);
   saveState();
@@ -475,8 +881,12 @@ function render(){
   const list=document.getElementById("historyList");list.innerHTML="";
   if(!state.history.length)list.innerHTML='<div class="empty">Chưa có pha bóng nào.</div>';
   else state.history.forEach((it,i)=>{
-    const row=document.createElement("div");row.className="history-item";
-    row.textContent=`#${state.history.length-i} • ${it.time} — ${it.text}`;list.appendChild(row);
+    const row=document.createElement("div");
+    row.className=it.type==="summary"?"history-item summary":"history-item";
+    row.textContent=it.type==="summary"
+      ?`${it.time}\n${it.text}`
+      :`#${state.history.length-i} • ${it.time} — ${it.text}`;
+    list.appendChild(row);
   });
 
   const wb=document.getElementById("winnerBox");
@@ -484,12 +894,26 @@ function render(){
   else{wb.classList.remove("show");wb.textContent=""}
   document.getElementById("winA").disabled=!!state.winner;
   document.getElementById("winB").disabled=!!state.winner;
+  document.getElementById("speakBtn").textContent=
+    state.winner?"🏆 Đọc kết quả trận đấu":"🔊 Đọc điểm";
+  document.getElementById("exportPdfBtn").style.display=
+    state.winner?"block":"none";
 }
 
 const settingsDialog=document.getElementById("settingsDialog");
 const manualDialog=document.getElementById("manualDialog");
 
 document.getElementById("settingsBtn").onclick=()=>{
+  const clubInfo=state.clubInfo||{};
+  document.getElementById("inputClubName").value=clubInfo.clubName||"";
+  document.getElementById("inputTournamentName").value=clubInfo.tournamentName||"";
+  document.getElementById("inputMatchName").value=clubInfo.matchName||"";
+  document.getElementById("inputMatchNumber").value=clubInfo.matchNumber||"";
+  document.getElementById("inputCourtNumber").value=clubInfo.courtNumber||"";
+  document.getElementById("inputVenue").value=clubInfo.venue||"";
+  document.getElementById("inputRefereeName").value=clubInfo.refereeName||"";
+  document.getElementById("inputRepresentativeName").value=clubInfo.representativeName||"";
+  document.getElementById("inputPresidentName").value=clubInfo.presidentName||"";
   document.getElementById("inputTeamA").value=state.teamA.name;
   document.getElementById("inputA1").value=state.teamA.players.p1;
   document.getElementById("inputA2").value=state.teamA.players.p2;
@@ -505,7 +929,19 @@ document.getElementById("settingsBtn").onclick=()=>{
 };
 document.getElementById("closeSettings").onclick=()=>settingsDialog.close();
 document.getElementById("saveSettings").onclick=()=>{
+  const previousClubInfo=clone(state.clubInfo||{});
   state=clone(defaultState);
+  state.clubInfo={
+    clubName:document.getElementById("inputClubName").value.trim(),
+    tournamentName:document.getElementById("inputTournamentName").value.trim(),
+    matchName:document.getElementById("inputMatchName").value.trim(),
+    matchNumber:document.getElementById("inputMatchNumber").value.trim(),
+    courtNumber:document.getElementById("inputCourtNumber").value.trim(),
+    venue:document.getElementById("inputVenue").value.trim(),
+    refereeName:document.getElementById("inputRefereeName").value.trim(),
+    representativeName:document.getElementById("inputRepresentativeName").value.trim(),
+    presidentName:document.getElementById("inputPresidentName").value.trim()
+  };
   state.teamA.name=document.getElementById("inputTeamA").value.trim()||"ĐỘI A";
   state.teamA.players.p1=document.getElementById("inputA1").value.trim()||"A1";
   state.teamA.players.p2=document.getElementById("inputA2").value.trim()||"A2";
@@ -522,6 +958,9 @@ document.getElementById("saveSettings").onclick=()=>{
   state.matchFirstServingTeam=state.servingTeam;
   state.serverPlayer=positionMap(state.servingTeam)[1];
   state.serverNumber=2;state.firstServerException=true;
+  state.stats=createEmptyStats();
+  state.summaryAdded=false;
+  registerServiceTurn(state.servingTeam,state.serverPlayer);
   addHistory(`Tạo trận mới. ${team(state.servingTeam).name} giao đầu, tỷ số 0-0-2.`);
   saveState();render();settingsDialog.close();
 };
@@ -558,6 +997,7 @@ document.getElementById("winA").onclick=()=>rallyWon("A");
 document.getElementById("winB").onclick=()=>rallyWon("B");
 document.getElementById("undoBtn").onclick=undo;
 document.getElementById("speakBtn").onclick=speakScore;
+document.getElementById("exportPdfBtn").onclick=exportResultPdf;
 document.getElementById("resetBtn").addEventListener("click", openResetDialog);
 document.getElementById("cancelReset").addEventListener("click", closeResetDialog);
 document.getElementById("confirmReset").addEventListener("click", resetMatch);
@@ -584,6 +1024,12 @@ document.getElementById("inputTarget").addEventListener("change",updateCapMinimu
 document.getElementById("inputWinMode").addEventListener("change",toggleCapScore);
 
 render();
+
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
