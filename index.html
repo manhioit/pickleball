@@ -144,8 +144,21 @@
       <label>Tên đội B<input id="inputTeamB" maxlength="24"></label>
       <label>Người B1 — đứng Ô 1 lúc đầu<input id="inputB1" maxlength="24"></label>
       <label>Người B2 — đứng Ô 2 lúc đầu<input id="inputB2" maxlength="24"></label>
-      <label>Điểm kết thúc
-        <select id="inputTarget"><option value="11">11 điểm</option><option value="15">15 điểm</option><option value="21">21 điểm</option></select>
+      <label>Điểm kết thúc cơ bản
+        <select id="inputTarget">
+          <option value="11">11 điểm</option>
+          <option value="13">13 điểm</option>
+          <option value="15">15 điểm</option>
+        </select>
+      </label>
+      <label>Điều kiện kết thúc
+        <select id="inputWinMode">
+          <option value="winByTwoWithCap">Thắng cách biệt 2 điểm, có điểm chạm tối đa</option>
+          <option value="firstToTarget">Chạm điểm đích là kết thúc ngay</option>
+        </select>
+      </label>
+      <label id="capScoreLabel">Điểm chạm tối đa
+        <input id="inputCapScore" type="number" min="12" max="99" value="15">
       </label>
       <label>Đội giao đầu tiên
         <select id="inputFirstServe"><option value="A">Đội A</option><option value="B">Đội B</option></select>
@@ -208,6 +221,8 @@ const defaultState={
   serverNumber:2,
   firstServerException:true,
   targetScore:11,
+  winMode:"winByTwoWithCap",
+  capScore:15,
   winner:null,
   courtSwapped:false,
   history:[],
@@ -220,7 +235,15 @@ function clone(v){return JSON.parse(JSON.stringify(v))}
 function loadState(){
   try{
     const saved=localStorage.getItem(STORAGE_KEY);
-    return saved?{...clone(defaultState),...JSON.parse(saved)}:clone(defaultState);
+    if(!saved)return clone(defaultState);
+    const parsed=JSON.parse(saved);
+    const normalizedMode=parsed.winMode==="winByTwo"?"winByTwoWithCap":(parsed.winMode||"winByTwoWithCap");
+    return {
+      ...clone(defaultState),
+      ...parsed,
+      winMode:normalizedMode,
+      capScore:Number(parsed.capScore)||15
+    };
   }catch{return clone(defaultState)}
 }
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
@@ -267,8 +290,26 @@ function addHistory(text){
 function vibrate(p=30){if(navigator.vibrate)navigator.vibrate(p)}
 
 function checkWinner(){
-  const a=state.teamA.score,b=state.teamB.score;
-  state.winner=((a>=state.targetScore||b>=state.targetScore)&&Math.abs(a-b)>=2)?(a>b?"A":"B"):null;
+  const a=state.teamA.score;
+  const b=state.teamB.score;
+
+  if(state.winMode==="firstToTarget"){
+    state.winner=a>=state.targetScore?"A":(b>=state.targetScore?"B":null);
+    return;
+  }
+
+  const cap=Math.max(state.targetScore+1,Number(state.capScore)||state.targetScore+4);
+
+  // Tới điểm chạm tối đa: đội nào đạt trước thắng ngay.
+  if(a>=cap||b>=cap){
+    state.winner=a>b?"A":"B";
+    return;
+  }
+
+  // Trước điểm chạm tối đa: phải đạt điểm đích và hơn 2 điểm.
+  state.winner=((a>=state.targetScore||b>=state.targetScore)&&Math.abs(a-b)>=2)
+    ?(a>b?"A":"B")
+    :null;
 }
 
 function newServiceForTeam(teamKey){
@@ -313,9 +354,29 @@ function rallyWon(winner){
 
 function speakScore(){
   if(!("speechSynthesis" in window))return;
+
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(scoreCall().replaceAll("-",","));
-  u.lang="vi-VN";u.rate=.9;speechSynthesis.speak(u);
+
+  const serverName=playerName(state.servingTeam,state.serverPlayer);
+  const serveCourt=serverCourt();
+  const rec=receiverInfo();
+  const receiverName=playerName(rec.team,rec.player);
+
+  const spokenScore=scoreCall()
+    .split("-")
+    .map(part=>part.trim())
+    .join(", ");
+
+  const text=
+    `Tỷ số ${spokenScore}. `+
+    `Lượt tới, ${serverName} giao bóng ở ô ${serveCourt}. `+
+    `${receiverName} nhận bóng ở ô ${rec.court}.`;
+
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="vi-VN";
+  u.rate=.88;
+  u.pitch=1;
+  speechSynthesis.speak(u);
 }
 
 function undo(){
@@ -354,6 +415,8 @@ function resetMatch(){
   state.teamA.score=0;
   state.teamB.score=0;
   state.targetScore=current.targetScore;
+  state.winMode=current.winMode||"winByTwoWithCap";
+  state.capScore=current.capScore||15;
   state.servingTeam=firstServingTeam;
   state.matchFirstServingTeam=firstServingTeam;
   state.serverNumber=2;
@@ -395,8 +458,12 @@ function render(){
   const rec=receiverInfo();
   const receiverName=playerName(rec.team,rec.player);
 
+  const endingRule=state.winMode==="firstToTarget"
+    ?`chạm ${state.targetScore} là thắng`
+    :`đến ${state.targetScore}, cách biệt 2; chạm ${state.capScore} kết thúc`;
+
   document.getElementById("statusLine").textContent=
-    `${team(state.servingTeam).name} đang giao • Người giao số ${state.serverNumber} • Giao từ Ô ${serverCourt()}`;
+    `${team(state.servingTeam).name} đang giao • Người giao số ${state.serverNumber} • Giao từ Ô ${serverCourt()} • ${endingRule}`;
   document.getElementById("serverPill").textContent=`🎾 Giao: ${serverName} (Ô ${serverCourt()})`;
   document.getElementById("receiverPill").textContent=`📥 Nhận: ${receiverName} (Ô ${rec.court})`;
 
@@ -430,6 +497,9 @@ document.getElementById("settingsBtn").onclick=()=>{
   document.getElementById("inputB1").value=state.teamB.players.p1;
   document.getElementById("inputB2").value=state.teamB.players.p2;
   document.getElementById("inputTarget").value=String(state.targetScore);
+  document.getElementById("inputWinMode").value=state.winMode||"winByTwoWithCap";
+  document.getElementById("inputCapScore").value=String(state.capScore||15);
+  toggleCapScore();
   document.getElementById("inputFirstServe").value=state.matchFirstServingTeam||state.servingTeam;
   settingsDialog.showModal();
 };
@@ -443,6 +513,11 @@ document.getElementById("saveSettings").onclick=()=>{
   state.teamB.players.p1=document.getElementById("inputB1").value.trim()||"B1";
   state.teamB.players.p2=document.getElementById("inputB2").value.trim()||"B2";
   state.targetScore=Number(document.getElementById("inputTarget").value);
+  state.winMode=document.getElementById("inputWinMode").value;
+  state.capScore=Math.max(
+    state.targetScore+1,
+    Number(document.getElementById("inputCapScore").value)||state.targetScore+4
+  );
   state.servingTeam=document.getElementById("inputFirstServe").value;
   state.matchFirstServingTeam=state.servingTeam;
   state.serverPlayer=positionMap(state.servingTeam)[1];
@@ -489,6 +564,24 @@ document.getElementById("confirmReset").addEventListener("click", resetMatch);
 document.getElementById("swapBtn").onclick=()=>{
   state.courtSwapped=!state.courtSwapped;addHistory("Đã ghi nhận đổi đầu sân.");saveState();render();vibrate(30);alert("Đã ghi nhận đổi đầu sân.");
 };
+
+function updateCapMinimum(){
+  const target=Number(document.getElementById("inputTarget").value)||11;
+  const capInput=document.getElementById("inputCapScore");
+  capInput.min=String(target+1);
+  if(Number(capInput.value)<=target){
+    capInput.value=String(target+4);
+  }
+}
+
+function toggleCapScore(){
+  const mode=document.getElementById("inputWinMode").value;
+  document.getElementById("capScoreLabel").style.display=
+    mode==="winByTwoWithCap"?"grid":"none";
+}
+
+document.getElementById("inputTarget").addEventListener("change",updateCapMinimum);
+document.getElementById("inputWinMode").addEventListener("change",toggleCapScore);
 
 render();
 </script>
