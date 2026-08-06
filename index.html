@@ -751,30 +751,75 @@ async function exportResultPdf(){
     const blob=buildSimplePdf(lines);
     const filename=
       `Ket-qua-${safeFileName(pairName(winnerKey))}-vs-${safeFileName(pairName(loserKey))}.pdf`;
-    const file=new File([blob],filename,{type:"application/pdf"});
 
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({
-        title:"Ket qua tran dau Pickleball",
-        text:"Luu bien ban ket qua tran dau",
-        files:[file]
-      });
-    }else{
-      const url=URL.createObjectURL(blob);
-      const anchor=document.createElement("a");
-      anchor.href=url;
-      anchor.download=filename;
-      anchor.style.display="none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      setTimeout(()=>{
+    let completed=false;
+
+    // Cách 1: chia sẻ tệp trên iPhone/iPad.
+    try{
+      if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
+        const file=new File([blob],filename,{type:"application/pdf"});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({
+            title:"Kết quả trận đấu Pickleball",
+            text:"Lưu biên bản kết quả trận đấu",
+            files:[file]
+          });
+          completed=true;
+        }
+      }
+    }catch(shareError){
+      // Người dùng đóng bảng chia sẻ không phải là lỗi tạo PDF.
+      if(shareError&&shareError.name==="AbortError"){
+        completed=true;
+      }else{
+        console.warn("Chia sẻ tệp không khả dụng:",shareError);
+      }
+    }
+
+    // Cách 2: tải trực tiếp trên Chrome/Edge/Safari máy tính.
+    if(!completed){
+      try{
+        const url=URL.createObjectURL(blob);
+        const anchor=document.createElement("a");
+        anchor.href=url;
+        anchor.download=filename;
+        anchor.rel="noopener";
+        anchor.style.display="none";
+        document.body.appendChild(anchor);
+        anchor.click();
         anchor.remove();
-        URL.revokeObjectURL(url);
-      },2000);
+
+        // Trên iPhone thuộc tính download có thể bị bỏ qua.
+        // Nếu trang không tải được, mở PDF trực tiếp trong tab mới.
+        setTimeout(()=>{
+          URL.revokeObjectURL(url);
+        },15000);
+        completed=true;
+      }catch(downloadError){
+        console.warn("Tải trực tiếp không khả dụng:",downloadError);
+      }
+    }
+
+    // Cách 3: mở PDF trong tab mới để người dùng chọn Chia sẻ > Lưu vào Tệp.
+    if(!completed){
+      const url=URL.createObjectURL(blob);
+      const opened=window.open(url,"_blank");
+      if(opened){
+        completed=true;
+        setTimeout(()=>URL.revokeObjectURL(url),60000);
+      }
+    }
+
+    if(!completed){
+      throw new Error("Trình duyệt không hỗ trợ lưu tệp PDF.");
     }
   }catch(error){
     console.error(error);
-    alert("Khong the tai PDF. Tren iPhone, hay mo bang Safari va chon Luu vao Tep trong bang chia se.");
+    alert(
+      "Không thể lưu PDF trên trình duyệt này. "+
+      "Hãy mở trang bằng Safari, không mở trong trình duyệt của Zalo/Facebook. "+
+      "Sau đó bấm Xuất PDF và chọn Lưu vào Tệp."
+    );
   }finally{
     button.disabled=false;
     button.textContent=oldText;
