@@ -77,6 +77,173 @@
       .actions{grid-template-columns:1fr 1fr}.actions .danger{grid-column:span 2}
       .team-card{padding:10px 7px}.slot{min-height:76px;padding:7px}.slot .player{font-size:15px}
     }
+  
+    .court-layout{display:grid;gap:0;margin-bottom:10px}
+    .court-layout .team-card{background:var(--panel);border:2px solid transparent;border-radius:20px;padding:12px;box-shadow:var(--shadow)}
+    .team-header-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+    .team-header-bottom{margin:10px 0 0}
+    .team-score-inline{font-size:clamp(18px,5vw,28px);font-weight:900}
+    .team-score-inline span{font-size:clamp(42px,14vw,76px);line-height:1;font-weight:950}
+    .team-a .team-score-inline span{color:#93c5fd}
+    .team-b .team-score-inline span{color:#fcd34d}
+    .court-a,.court-b{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .court-layout .net{margin:8px 0;border-radius:10px}
+
+  
+    /* ===== Responsive one-screen referee layout ===== */
+    html,body{height:100%;overflow-x:hidden}
+    body{
+      min-height:100dvh;
+      padding:max(6px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom));
+    }
+    .app{
+      width:min(100%,760px);
+      min-height:calc(100dvh - max(14px,env(safe-area-inset-top)) - max(14px,env(safe-area-inset-bottom)));
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .topbar{margin-bottom:0;min-height:40px}
+    h1{font-size:clamp(18px,4.4vw,28px)}
+    .small-btn{padding:8px 11px}
+    .winner{margin-bottom:0;padding:9px;font-size:clamp(16px,4vw,20px)}
+    .status{
+      margin-bottom:0;
+      padding:clamp(8px,1.8vh,13px);
+      border-radius:15px;
+    }
+    .call{font-size:clamp(28px,8vh,54px)}
+    .status-line{margin-top:5px;font-size:clamp(12px,1.8vh,15px)}
+    .serve-receive{margin-top:7px;gap:6px}
+    .pill{padding:7px 6px;font-size:clamp(11px,1.7vh,14px)}
+    .court-layout{
+      flex:1 1 auto;
+      min-height:0;
+      display:grid;
+      grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto;
+      gap:4px;
+      margin-bottom:0;
+    }
+    .court-layout .team-card{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      padding:clamp(7px,1.4vh,11px);
+      border-radius:16px;
+    }
+    .team-header-row{
+      min-height:0;
+      margin-bottom:5px;
+      gap:6px;
+    }
+    .team-header-bottom{margin:5px 0 0}
+    .team-name{font-size:clamp(15px,2.6vh,22px)}
+    .team-score-inline{font-size:clamp(13px,2vh,22px)}
+    .team-score-inline span{font-size:clamp(30px,7.2vh,60px)}
+    .court-a,.court-b{
+      flex:1 1 auto;
+      min-height:0;
+      gap:6px;
+    }
+    .slot{
+      min-height:0;
+      height:100%;
+      padding:clamp(5px,1vh,8px);
+      border-radius:11px;
+    }
+    .slot .label{font-size:clamp(11px,1.7vh,13px)}
+    .slot .player{font-size:clamp(13px,2.2vh,18px);margin-top:3px}
+    .court-layout .net{
+      margin:0;
+      padding:4px;
+      font-size:clamp(11px,1.7vh,14px);
+      letter-spacing:1.5px;
+    }
+    .court-note{
+      margin-top:0;
+      font-size:clamp(10px,1.45vh,12px);
+      text-align:center;
+    }
+    .rally-buttons{
+      margin-bottom:0;
+      gap:7px;
+    }
+    .rally-btn{
+      min-height:clamp(64px,10vh,92px);
+      padding:8px 6px;
+      border-radius:15px;
+      font-size:clamp(15px,2.5vh,22px);
+    }
+    .rally-btn span{font-size:clamp(10px,1.4vh,12px);margin-top:4px}
+    .actions{
+      margin-bottom:0;
+      gap:6px;
+    }
+    .action-btn{
+      min-height:clamp(40px,6vh,50px);
+      font-size:clamp(12px,1.7vh,15px);
+      padding:5px;
+    }
+    .history{
+      flex:0 0 auto;
+      padding:9px;
+      border-radius:14px;
+    }
+    .history h2{font-size:14px;margin-bottom:5px}
+    .history-list{max-height:72px;gap:4px}
+    .history-item{padding:6px;font-size:11px}
+
+    @media (max-height:760px){
+      .history{display:none}
+      .status-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .court-note{display:none}
+      .rally-btn span{display:none}
+    }
+
+    @media (max-height:650px){
+      .topbar h1{font-size:17px}
+      .serve-receive{grid-template-columns:1fr 1fr}
+      .status{padding:6px}
+      .call{font-size:30px}
+      .status-line{font-size:11px}
+      .pill{padding:5px;font-size:10px}
+      .team-header-row{margin-bottom:2px}
+      .team-header-bottom{margin-top:2px}
+      .team-score-inline span{font-size:32px}
+      .slot .player{font-size:13px}
+      .rally-btn{min-height:56px}
+      .action-btn{min-height:36px;font-size:11px}
+    }
+
+    @media (max-width:430px){
+      .app{gap:5px}
+      .serve-receive{grid-template-columns:1fr 1fr}
+      .actions{grid-template-columns:repeat(3,1fr)}
+      .actions .danger{grid-column:auto}
+      .team-header-row{align-items:center}
+    }
+
+    @media (orientation:landscape) and (max-height:520px){
+      body{padding:4px}
+      .app{
+        width:100%;
+        max-width:none;
+        display:grid;
+        grid-template-columns:minmax(280px,40%) 1fr;
+        grid-template-rows:auto 1fr auto;
+        gap:6px;
+      }
+      .topbar{grid-column:1 / 3}
+      .status{grid-column:1;grid-row:2}
+      .court-layout{grid-column:2;grid-row:2 / 4}
+      .rally-buttons{grid-column:1;grid-row:3}
+      .actions,.history,.winner{display:none}
+      .court-layout .team-card{padding:5px}
+      .team-score-inline span{font-size:28px}
+      .slot .player{font-size:12px}
+    }
+
   </style>
 </head>
 <body>
@@ -97,29 +264,33 @@
     </div>
   </section>
 
-  <section class="score-grid">
+  <section class="court-layout">
     <article id="teamACard" class="team-card team-a serving">
-      <div id="teamAName" class="team-name">ĐỘI A</div>
-      <div id="teamAScore" class="score">0</div>
-      <div class="court">
+      <div class="team-header-row">
+        <div id="teamAName" class="team-name">ĐỘI A</div>
+        <div class="team-score-inline"><span id="teamAScore">0</span> điểm</div>
+      </div>
+      <div class="court court-a">
         <div id="A1" class="slot"><div class="label">Ô 1</div><div class="player"></div></div>
         <div id="A2" class="slot"><div class="label">Ô 2</div><div class="player"></div></div>
       </div>
-      <div class="court-note">Ô 1 = bên phải • Ô 2 = bên trái</div>
     </article>
 
+    <div class="net">LƯỚI</div>
+
     <article id="teamBCard" class="team-card team-b">
-      <div id="teamBName" class="team-name">ĐỘI B</div>
-      <div id="teamBScore" class="score">0</div>
-      <div class="court">
+      <div class="court court-b">
         <div id="B2" class="slot"><div class="label">Ô 2</div><div class="player"></div></div>
         <div id="B1" class="slot"><div class="label">Ô 1</div><div class="player"></div></div>
       </div>
-      <div class="court-note">Ô 1 = bên phải • Ô 2 = bên trái</div>
+      <div class="team-header-row team-header-bottom">
+        <div id="teamBName" class="team-name">ĐỘI B</div>
+        <div class="team-score-inline"><span id="teamBScore">0</span> điểm</div>
+      </div>
     </article>
-  </section>
 
-  <div class="net">LƯỚI</div>
+    <div class="court-note">Đội A: Ô 1 bên trái • Đội B: Ô 1 bên phải</div>
+  </section>
 
   <section class="rally-buttons">
     <button id="winA" type="button" class="rally-btn rally-a">ĐỘI A THẮNG PHA<span>Chạm một lần</span></button>
