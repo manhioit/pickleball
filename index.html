@@ -131,7 +131,7 @@
     <button id="speakBtn" type="button" class="action-btn">🔊 Đọc điểm</button>
     <button id="manualBtn" type="button" class="action-btn">✎ Sửa</button>
     <button id="swapBtn" type="button" class="action-btn warn">⇄ Đổi đầu sân</button>
-    <button id="exportPdfBtn" type="button" class="action-btn" style="display:none">📄 Xuất kết quả PDF</button>
+    <button id="exportWordBtn" type="button" class="action-btn" style="display:none">📄 Xuất biên bản Word</button>
     <button id="resetBtn" type="button" class="action-btn danger">⟲ Trận mới</button>
   </section>
 
@@ -670,160 +670,124 @@ function buildSimplePdf(lines){
   return new Blob([pdf],{type:"application/pdf"});
 }
 
-async function exportResultPdf(){
+function safeFileName(value){
+  return String(value||"")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/đ/g,"d")
+    .replace(/Đ/g,"D")
+    .replace(/[^a-zA-Z0-9_-]+/g,"-")
+    .replace(/^-+|-+$/g,"");
+}
+
+function exportResultWord(){
   if(!state.winner){
-    alert("Chi co the xuat ket qua sau khi tran dau ket thuc.");
+    alert("Chỉ có thể xuất biên bản sau khi trận đấu kết thúc.");
     return;
   }
 
   ensureStats();
 
-  const button=document.getElementById("exportPdfBtn");
-  const oldText=button.textContent;
-  button.disabled=true;
-  button.textContent="Dang tao PDF...";
+  const winnerKey=state.winner;
+  const loserKey=other(winnerKey);
+  const winnerTeam=team(winnerKey);
+  const loserTeam=team(loserKey);
+  const totalRallies=state.stats.A.serviceRallies+state.stats.B.serviceRallies;
+  const createdAt=new Date().toLocaleString("vi-VN");
+  const info=state.clubInfo||{};
 
-  try{
-    const winnerKey=state.winner;
-    const loserKey=other(winnerKey);
-    const winnerTeam=team(winnerKey);
-    const loserTeam=team(loserKey);
-    const info=state.clubInfo||{};
-    const totalRallies=state.stats.A.serviceRallies+state.stats.B.serviceRallies;
+  const playerRows=["A","B"].map(teamKey=>{
+    return ["p1","p2"].map(playerKey=>{
+      const ps=state.stats[teamKey].players[playerKey];
+      return `
+        <tr>
+          <td>${escapeHtml(pairName(teamKey))}</td>
+          <td>${escapeHtml(playerName(teamKey,playerKey))}</td>
+          <td>${ps.serviceTurns}</td>
+          <td>${ps.serviceRallies}</td>
+          <td>${ps.pointsOnServe}</td>
+          <td>${percent(ps.pointsOnServe,ps.serviceRallies)}%</td>
+        </tr>`;
+    }).join("");
+  }).join("");
 
-    const lines=[
-      "## BIEN BAN KET QUA TRAN DAU PICKLEBALL",
-      info.clubName?`# CAU LAC BO: ${info.clubName}`:"",
-      info.tournamentName?`Giai dau: ${info.tournamentName}`:"",
-      info.matchNumber?`Tran so: ${info.matchNumber}`:"",
-      info.matchName?`Ten tran: ${info.matchName}`:"",
-      info.courtNumber?`San so: ${info.courtNumber}`:"",
-      info.venue?`Dia diem: ${info.venue}`:"",
-      `Thoi gian xuat: ${new Date().toLocaleString("vi-VN")}`,
-      "",
-      "# KET QUA",
-      `Doi chien thang: ${pairName(winnerKey)}`,
-      `Ty so: ${winnerTeam.score} - ${loserTeam.score}`,
-      `${pairName(winnerKey)} thang ${pairName(loserKey)}`,
-      "",
-      stripVietnamese(resultAnnouncementText()),
-      "",
-      "# THONG KE DOI A",
-      `Doi: ${pairName("A")}`,
-      `Tong luot cam giao: ${state.stats.A.serviceTurns}`,
-      `Tong pha giao bong: ${state.stats.A.serviceRallies}`,
-      `Diem ghi khi giao: ${state.stats.A.pointsOnServe}`,
-      `Hieu suat: ${percent(state.stats.A.pointsOnServe,state.stats.A.serviceRallies)}%`,
-      "",
-      "# THONG KE DOI B",
-      `Doi: ${pairName("B")}`,
-      `Tong luot cam giao: ${state.stats.B.serviceTurns}`,
-      `Tong pha giao bong: ${state.stats.B.serviceRallies}`,
-      `Diem ghi khi giao: ${state.stats.B.pointsOnServe}`,
-      `Hieu suat: ${percent(state.stats.B.pointsOnServe,state.stats.B.serviceRallies)}%`,
-      "",
-      `Tong so pha giao bong toan tran: ${totalRallies}`,
-      "",
-      "# THONG KE TUNG VAN DONG VIEN"
-    ].filter(Boolean);
+  const documentHtml=`<!DOCTYPE html>
+  <html xmlns:o="urn:schemas-microsoft-com:office:office"
+        xmlns:w="urn:schemas-microsoft-com:office:word"
+        xmlns="http://www.w3.org/TR/REC-html40">
+  <head>
+    <meta charset="UTF-8">
+    <title>Biên bản kết quả trận đấu</title>
+    <style>
+      body{font-family:Arial,sans-serif;color:#111827;line-height:1.45;margin:28px}
+      h1{text-align:center;font-size:22px;margin:0 0 8px}
+      .center{text-align:center}.muted{color:#4b5563}
+      .result{border:2px solid #111827;padding:16px;text-align:center;margin:18px 0}
+      .score{font-size:32px;font-weight:bold;margin:8px 0}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      th,td{border:1px solid #777;padding:7px;text-align:center;font-size:12px}
+      th{background:#e5e7eb}
+      .signatures{width:100%;margin-top:34px}
+      .signatures td{border:none;text-align:center;vertical-align:top;width:33%}
+      .space{height:60px}
+    </style>
+  </head>
+  <body>
+    ${info.clubName?`<div class="center"><b>CÂU LẠC BỘ ${escapeHtml(info.clubName).toUpperCase()}</b></div>`:""}
+    <h1>BIÊN BẢN KẾT QUẢ TRẬN ĐẤU PICKLEBALL</h1>
+    ${info.tournamentName?`<div class="center"><b>${escapeHtml(info.tournamentName)}</b></div>`:""}
+    <div class="center muted">
+      ${info.matchNumber?`Trận số: ${escapeHtml(info.matchNumber)} &nbsp;&nbsp;`:""}
+      ${info.matchName?`Tên trận: ${escapeHtml(info.matchName)} &nbsp;&nbsp;`:""}
+      ${info.courtNumber?`Sân số: ${escapeHtml(info.courtNumber)}`:""}
+    </div>
+    ${info.venue?`<div class="center muted">Địa điểm: ${escapeHtml(info.venue)}</div>`:""}
+    <div class="center muted">Thời gian xuất: ${escapeHtml(createdAt)}</div>
 
-    ["A","B"].forEach(teamKey=>{
-      ["p1","p2"].forEach(playerKey=>{
-        const ps=state.stats[teamKey].players[playerKey];
-        lines.push(
-          `${playerName(teamKey,playerKey)} - ${pairName(teamKey)}: `+
-          `${ps.serviceTurns} luot cam giao; ${ps.serviceRallies} pha giao; `+
-          `${ps.pointsOnServe} diem; hieu suat ${percent(ps.pointsOnServe,ps.serviceRallies)}%`
-        );
-      });
-    });
+    <div class="result">
+      <b>ĐỘI CHIẾN THẮNG: ${escapeHtml(pairName(winnerKey))}</b>
+      <div class="score">${winnerTeam.score} - ${loserTeam.score}</div>
+      <div>${escapeHtml(resultAnnouncementText())}</div>
+    </div>
 
-    lines.push(
-      "",
-      "# XAC NHAN",
-      `Trong tai: ${info.refereeName||""}`,
-      `Dai dien VDV: ${info.representativeName||""}`,
-      `Chu tich CLB: ${info.presidentName||""}`,
-      "",
-      "Xin cam on cac van dong vien."
-    );
+    <h3>THỐNG KÊ HAI ĐỘI</h3>
+    <table>
+      <tr><th>Chỉ số</th><th>${escapeHtml(pairName("A"))}</th><th>${escapeHtml(pairName("B"))}</th></tr>
+      <tr><td>Tổng lượt cầm giao</td><td>${state.stats.A.serviceTurns}</td><td>${state.stats.B.serviceTurns}</td></tr>
+      <tr><td>Tổng pha giao bóng</td><td>${state.stats.A.serviceRallies}</td><td>${state.stats.B.serviceRallies}</td></tr>
+      <tr><td>Điểm ghi khi giao</td><td>${state.stats.A.pointsOnServe}</td><td>${state.stats.B.pointsOnServe}</td></tr>
+      <tr><td>Hiệu suất giao</td><td>${percent(state.stats.A.pointsOnServe,state.stats.A.serviceRallies)}%</td><td>${percent(state.stats.B.pointsOnServe,state.stats.B.serviceRallies)}%</td></tr>
+    </table>
 
-    const blob=buildSimplePdf(lines);
-    const filename=
-      `Ket-qua-${safeFileName(pairName(winnerKey))}-vs-${safeFileName(pairName(loserKey))}.pdf`;
+    <p><b>Tổng số pha giao bóng toàn trận:</b> ${totalRallies}</p>
 
-    let completed=false;
+    <h3>THỐNG KÊ TỪNG VẬN ĐỘNG VIÊN</h3>
+    <table>
+      <tr><th>Đội</th><th>Người chơi</th><th>Lượt cầm giao</th><th>Pha giao</th><th>Điểm khi giao</th><th>Hiệu suất</th></tr>
+      ${playerRows}
+    </table>
 
-    // Cách 1: chia sẻ tệp trên iPhone/iPad.
-    try{
-      if(typeof File!=="undefined"&&navigator.share&&navigator.canShare){
-        const file=new File([blob],filename,{type:"application/pdf"});
-        if(navigator.canShare({files:[file]})){
-          await navigator.share({
-            title:"Kết quả trận đấu Pickleball",
-            text:"Lưu biên bản kết quả trận đấu",
-            files:[file]
-          });
-          completed=true;
-        }
-      }
-    }catch(shareError){
-      // Người dùng đóng bảng chia sẻ không phải là lỗi tạo PDF.
-      if(shareError&&shareError.name==="AbortError"){
-        completed=true;
-      }else{
-        console.warn("Chia sẻ tệp không khả dụng:",shareError);
-      }
-    }
+    <table class="signatures">
+      <tr>
+        <td><b>Trọng tài</b><div class="space"></div>${escapeHtml(info.refereeName||"")}</td>
+        <td><b>Đại diện VĐV</b><div class="space"></div>${escapeHtml(info.representativeName||"")}</td>
+        <td><b>Chủ tịch CLB</b><div class="space"></div>${escapeHtml(info.presidentName||"")}</td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
 
-    // Cách 2: tải trực tiếp trên Chrome/Edge/Safari máy tính.
-    if(!completed){
-      try{
-        const url=URL.createObjectURL(blob);
-        const anchor=document.createElement("a");
-        anchor.href=url;
-        anchor.download=filename;
-        anchor.rel="noopener";
-        anchor.style.display="none";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-
-        // Trên iPhone thuộc tính download có thể bị bỏ qua.
-        // Nếu trang không tải được, mở PDF trực tiếp trong tab mới.
-        setTimeout(()=>{
-          URL.revokeObjectURL(url);
-        },15000);
-        completed=true;
-      }catch(downloadError){
-        console.warn("Tải trực tiếp không khả dụng:",downloadError);
-      }
-    }
-
-    // Cách 3: mở PDF trong tab mới để người dùng chọn Chia sẻ > Lưu vào Tệp.
-    if(!completed){
-      const url=URL.createObjectURL(blob);
-      const opened=window.open(url,"_blank");
-      if(opened){
-        completed=true;
-        setTimeout(()=>URL.revokeObjectURL(url),60000);
-      }
-    }
-
-    if(!completed){
-      throw new Error("Trình duyệt không hỗ trợ lưu tệp PDF.");
-    }
-  }catch(error){
-    console.error(error);
-    alert(
-      "Không thể lưu PDF trên trình duyệt này. "+
-      "Hãy mở trang bằng Safari, không mở trong trình duyệt của Zalo/Facebook. "+
-      "Sau đó bấm Xuất PDF và chọn Lưu vào Tệp."
-    );
-  }finally{
-    button.disabled=false;
-    button.textContent=oldText;
-  }
+  const blob=new Blob(["\ufeff",documentHtml],{type:"application/msword;charset=utf-8"});
+  const filename=`Ket-qua-${safeFileName(pairName(winnerKey))}-vs-${safeFileName(pairName(loserKey))}.doc`;
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement("a");
+  anchor.href=url;
+  anchor.download=filename;
+  anchor.rel="noopener";
+  anchor.style.display="none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  setTimeout(()=>{anchor.remove();URL.revokeObjectURL(url);},3000);
 }
 
 function undo(){
@@ -941,7 +905,7 @@ function render(){
   document.getElementById("winB").disabled=!!state.winner;
   document.getElementById("speakBtn").textContent=
     state.winner?"🏆 Đọc kết quả trận đấu":"🔊 Đọc điểm";
-  document.getElementById("exportPdfBtn").style.display=
+  document.getElementById("exportWordBtn").style.display=
     state.winner?"block":"none";
 }
 
@@ -1042,7 +1006,7 @@ document.getElementById("winA").onclick=()=>rallyWon("A");
 document.getElementById("winB").onclick=()=>rallyWon("B");
 document.getElementById("undoBtn").onclick=undo;
 document.getElementById("speakBtn").onclick=speakScore;
-document.getElementById("exportPdfBtn").onclick=exportResultPdf;
+document.getElementById("exportWordBtn").onclick=exportResultWord;
 document.getElementById("resetBtn").addEventListener("click", openResetDialog);
 document.getElementById("cancelReset").addEventListener("click", closeResetDialog);
 document.getElementById("confirmReset").addEventListener("click", resetMatch);
